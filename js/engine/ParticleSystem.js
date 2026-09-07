@@ -36,7 +36,7 @@ class Particle {
         ctx.globalAlpha = this.alpha;
         ctx.fillStyle = this.color;
         ctx.shadowColor = this.color;
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 8;
 
         ctx.beginPath();
         if (this.shape === 'square') {

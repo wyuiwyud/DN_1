@@ -24,17 +24,43 @@ class StorageManager {
         }
     }
 
-    getHighScore() {
-        return this.get('highscore', 0);
+    getHighScore(gameId = 'global') {
+        const legacyHigh = parseInt(localStorage.getItem('picko247_highscore')) || 0;
+        const stored = this.get('highscore_' + gameId, this.get('highscore', 0));
+        return Math.max(stored, legacyHigh);
     }
 
-    saveHighScore(score) {
-        const current = this.getHighScore();
+    saveHighScore(score, gameId = 'global') {
+        const current = this.getHighScore(gameId);
         if (score > current) {
-            this.set('highscore', score);
-            return true;
+            this.set('highscore_' + gameId, score);
+            const globalHigh = Math.max(this.get('highscore', 0), score);
+            this.set('highscore', globalHigh);
+            try {
+                localStorage.setItem('picko247_highscore', globalHigh);
+            } catch (e) {}
+
+            this.addRecordHistory({
+                score: score,
+                previousScore: current,
+                gameId: gameId,
+                date: new Date().toLocaleString('vi-VN')
+            });
+
+            return { isNewHigh: true, previousHigh: current, newHigh: score };
         }
-        return false;
+        return { isNewHigh: false, previousHigh: current, newHigh: current };
+    }
+
+    getRecordHistory() {
+        return this.get('records_history', []);
+    }
+
+    addRecordHistory(record) {
+        const history = this.getRecordHistory();
+        history.unshift(record);
+        if (history.length > 30) history.pop();
+        this.set('records_history', history);
     }
 }
 

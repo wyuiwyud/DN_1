@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Picko 247 - Pickleball Clash</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --pick-blue: #3498DB;
+            --pick-green: #D4E157;
+            --pick-orange: #F39C12;
+        }
+        body { background-color: #111827; color: white; font-family: 'Segoe UI', sans-serif; user-select: none; overflow: hidden; }
+        canvas { background-color: #1f2937; border: 4px solid var(--pick-blue); border-radius: 8px; box-shadow: 0 0 20px rgba(52, 152, 219, 0.4); display: block; margin: 0 auto; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <header class="p-4 border-b border-gray-700 bg-gray-900 flex justify-between items-center shadow-lg">
+        <div class="text-3xl font-black tracking-tighter">
+            <span class="text-[#3498DB]">PICK</span><span class="text-[#D4E157]">O</span><span class="text-[#F39C12]">247</span>
+        </div>
+        <div class="text-xl font-bold bg-gray-800 px-6 py-2 rounded-full border border-gray-700">
+            <span class="text-[#3498DB]">BẠN: <span id="scorePlayer">0</span></span>
+            <span class="mx-4 text-white">|</span>
+            <span class="text-pink-500">MÁY: <span id="scoreAI">0</span></span>
+        </div>
+    </header>
+
+    <main class="flex-grow flex flex-col items-center justify-center p-6 relative">
+        <div class="text-center mb-4">
+            <h1 class="text-2xl font-black text-[#F39C12] uppercase tracking-wide">Pickleball Clash 1v1</h1>
+            <p class="text-gray-400 text-sm mt-1">Điều khiển: Phím ⬅️ ➡️ để di chuyển | Phím ⬆️ để nhảy | Phím <kbd class="bg-gray-700 px-2 rounded">Space</kbd> để vung vợt đánh bóng</p>
+        </div>
+
+        <div class="relative w-full max-w-4xl">
+            <!-- Màn hình ngang rộng hơn để phù hợp với sân 1v1 -->
+            <canvas id="gameCanvas" width="800" height="400"></canvas>
+            
+            <div id="startScreen" class="absolute inset-0 bg-gray-900/90 flex flex-col items-center justify-center z-10 transition-opacity">
+                <h2 class="text-4xl font-bold text-white mb-6 text-[#D4E157]">SẴN SÀNG ĐỐI ĐẦU?</h2>
+                <button onclick="startGame()" class="px-8 py-3 bg-[#3498DB] hover:bg-blue-500 rounded-full font-bold text-white text-lg transition shadow-lg">Vào Sân Ngay</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const scorePlayerEl = document.getElementById("scorePlayer");
+        const scoreAIEl = document.getElementById("scoreAI");
+        const startScreen = document.getElementById("startScreen");
+
+        // Trạng thái chung
+        let isGameStarted = false;
+        let scorePlayer = 0;
+        let scoreAI = 0;
+        const groundY = 350; // Mặt sân
+
+        // Khởi tạo Lưới (Net)
+        const net = { x: 395, y: 220, w: 10, h: 130, color: "#95A5A6" };
+
+        // Đối tượng Quả bóng
+        const ball = {
+            x: 200, y: 100, radius: 10,
+            vx: 0, vy: 0, gravity: 0.4, bounce: 0.6,
+            color: "#D4E157",
+            reset(turnLeft) {
+                this.x = turnLeft ? 200 : 600;
+                this.y = 100;
+                this.vx = 0;
+                this.vy = 0;
+            }
+        };
+
+        // Class Nhân vật (Dùng chung cho Player và AI)
+        class Character {
+            constructor(x, color, isAI = false) {
+                this.x = x;
+                this.y = groundY - 80;
+                this.w = 40;
+                this.h = 80;
+                this.color = color;
+                this.speed = 5;
+                this.vy = 0;
+                this.gravity = 0.8;
+                this.isGrounded = false;
+                this.isAI = isAI;
+                this.swingTimer = 0; // Hiệu ứng vung vợt
+            }
+
+            draw() {
+                // Vẽ thân
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.w, this.h);
+                // Vẽ đầu
+                ctx.beginPath();
+                ctx.arc(this.x + this.w/2, this.y - 15, 20, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Vẽ vợt
+                ctx.fillStyle = "#E74C3C";
+                if (this.swingTimer > 0) {
+                    // Trạng thái đang vung vợt (Vợt vươn dài ra trước)
+                    let reachX = this.isAI ? this.x - 30 : this.x + this.w + 10;
+                    ctx.fillRect(reachX, this.y + 10, 20, 40);
+                    this.swingTimer--;
+                } else {
+                    // Trạng thái nghỉ (Vợt cầm sát người)
+                    let restX = this.isAI ? this.x - 10 : this.x + this.w - 10;
+                    ctx.fillRect(restX, this.y + 30, 20, 40);
+                }
+            }
+
+            update() {
+                // Xử lý trọng lực và nhảy
+                this.vy += this.gravity;
+                this.y += this.vy;
+                if (this.y + this.h >= groundY) {
+                    this.y = groundY - this.h;
+                    this.vy = 0;
+                    this.isGrounded = true;
+                }
+
+                // AI Logic (Tự động di chuyển và đánh bóng)
+                if (this.isAI && isGameStarted) {
+                    // Di chuyển theo bóng nếu bóng bay sang phần sân AI (x > 400)
+                    if (ball.x > 400) {
+                        let targetX = ball.x + 20; // Đứng hơi lui về sau bóng để đón
+                        if (this.x < targetX - 10 && this.x + this.w < canvas.width) this.x += this.speed - 1.5;
+                        if (this.x > targetX + 10 && this.x > 410) this.x -= this.speed - 1.5;
+
+                        // Tự động vung vợt nếu bóng vào tầm đánh
+                        let dist = Math.hypot(ball.x - (this.x + this.w/2), ball.y - (this.y + this.h/2));
+                        if (dist < 80 && ball.x < this.x + 20) {
+                            this.hitBall(-1); // Đánh bóng về bên trái
+                        }
+                    } else {
+                        // Trở về vị trí trung tâm sân nhà
+                        if (this.x > 600) this.x -= this.speed - 2;
+                        if (this.x < 590) this.x += this.speed - 2;
+                    }
+                }
+            }
+
+            jump() {
+                if (this.isGrounded) {
+                    this.vy = -12;
+                    this.isGrounded = false;
+                }
+            }
+
+            hitBall(direction) {
+                this.swingTimer = 15; // Kích hoạt animation vung vợt 15 frames
+                // Tính toán lực đánh
+                ball.vx = direction * (7 + Math.random() * 3); // Lực ngang
+                ball.vy = -8 - Math.random() * 4; // Lực nảy lên (để qua lưới)
+            }
+        }
+
+        const player = new Character(100, "#3498DB", false);
+        const ai = new Character(650, "#FF69B4", true);
+
+        // Quản lý Input của người chơi
+        const keys = { ArrowLeft: false, ArrowRight: false };
+
+        window.addEventListener("keydown", (e) => {
+            if (keys.hasOwnProperty(e.code)) keys[e.code] = true;
+            if (e.code === "ArrowUp") player.jump();
+            if (e.code === "Space") {
+                // Kiểm tra xem bóng có trong tầm vung vợt không
+                let dist = Math.hypot(ball.x - (player.x + player.w/2), ball.y - (player.y + player.h/2));
+                if (dist < 90 && ball.x > player.x - 20) { // Tầm đánh 90px
+                    player.hitBall(1); // Đánh về bên phải
+                } else {
+                    player.swingTimer = 15; // Vẫn vung vợt nhưng trượt (miss)
+                }
+            }
+        });
+
+        window.addEventListener("keyup", (e) => {
+            if (keys.hasOwnProperty(e.code)) keys[e.code] = false;
+        });
+
+        function handlePhysics() {
+            // Di chuyển Player 1
+            if (keys.ArrowLeft && player.x > 0) player.x -= player.speed;
+            if (keys.ArrowRight && player.x + player.w < net.x - 10) player.x += player.speed; // Không vượt qua lưới
+
+            // Vật lý của bóng
+            ball.vy += ball.gravity;
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // Bóng chạm lưới (Bật ngược lại)
+            if (ball.x + ball.radius > net.x && ball.x - ball.radius < net.x + net.w) {
+                if (ball.y + ball.radius > net.y) {
+                    ball.vx *= -0.8;
+                }
+            }
+
+            // Bóng chạm tường trái/phải
+            if (ball.x - ball.radius <= 0 || ball.x + ball.radius >= canvas.width) {
+                ball.vx *= -0.8;
+            }
+
+            // Bóng rơi chạm sân (Xử lý ghi điểm)
+            if (ball.y + ball.radius >= groundY) {
+                ball.y = groundY - ball.radius;
+                ball.vx = 0;
+                
+                // Xác định điểm thuộc về ai
+                if (ball.x > net.x) {
+                    scorePlayer++; // Rơi sân địch -> Bạn ăn điểm
+                    scorePlayerEl.innerText = scorePlayer;
+                    setTimeout(() => ball.reset(false), 1000); // Máy giao bóng
+                } else {
+                    scoreAI++; // Rơi sân nhà -> Máy ăn điểm
+                    scoreAIEl.innerText = scoreAI;
+                    setTimeout(() => ball.reset(true), 1000); // Bạn giao bóng
+                }
+                
+                // Tạm đưa bóng ra ngoài màn hình chờ reset
+                ball.y = 1000; 
+            }
+        }
+
+        function drawEnvironment() {
+            // Sân đấu
+            ctx.fillStyle = "#27AE60"; // Màu xanh sân
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+            
+            // Lưới Pickleball
+            ctx.fillStyle = net.color;
+            ctx.fillRect(net.x, net.y, net.w, net.h);
+            ctx.fillStyle = "#ECF0F1"; // Viền trắng mép trên của lưới
+            ctx.fillRect(net.x - 2, net.y, net.w + 4, 10);
+            
+            // Vẽ bóng
+            ctx.fillStyle = ball.color;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function startGame() {
+            startScreen.classList.add("hidden");
+            isGameStarted = true;
+            ball.reset(true);
+        }
+
+        function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (isGameStarted) {
+                handlePhysics();
+                player.update();
+                ai.update();
+            }
+
+            drawEnvironment();
+            player.draw();
+            ai.draw();
+
+            requestAnimationFrame(loop);
+        }
+
+        loop(); // Khởi động vòng lặp
+    </script>
+</body>
+</html>

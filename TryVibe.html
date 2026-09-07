@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Picko 247 - Pickleball Training Mode</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --pick-blue: #3498DB;
+            --pick-green: #D4E157;
+            --pick-orange: #F39C12;
+        }
+        body { background-color: #111827; color: white; font-family: 'Segoe UI', sans-serif; user-select: none; overflow: hidden; display: flex; flex-direction: column; min-height: 100vh; justify-content: center; align-items: center; }
+        canvas { border: 4px solid var(--pick-blue); border-radius: 8px; box-shadow: 0 0 30px rgba(52, 152, 219, 0.5); display: block; background: #1f2937; }
+        .try-icon { display: inline-block; font-size: 1.5rem; transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .try-icon.lost { transform: scale(0.85) rotate(5deg); opacity: 0.9; }
+        
+        @keyframes recordPop {
+            0% { transform: translate(-50%, -20px) scale(0.8); opacity: 0; }
+            50% { transform: translate(-50%, 0) scale(1.1); opacity: 1; }
+            100% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+        }
+        .record-banner-active {
+            display: flex !important;
+            animation: recordPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER THÔNG TIN TRÒ CHƠI -->
+    <header class="w-full max-w-[800px] p-4 mb-3 bg-gray-900 flex justify-between items-center rounded-lg border border-gray-700 shadow-lg">
+        <div class="text-2xl font-black tracking-tighter">
+            <span class="text-[#3498DB]">PICK</span><span class="text-[#D4E157]">O</span><span class="text-[#F39C12]">247</span>
+        </div>
+        
+        <div class="flex items-center gap-6">
+            <div class="flex items-center gap-2">
+                <span class="font-bold text-gray-400 uppercase text-sm">Try:</span>
+                <div id="livesDisplay" class="flex gap-2">
+                    <span class="try-icon" id="try1">✔️</span>
+                    <span class="try-icon" id="try2">✔️</span>
+                </div>
+            </div>
+
+            <div class="text-base font-bold bg-gray-800 px-5 py-1.5 rounded-full border border-gray-700 shadow-[0_0_15px_rgba(212,225,87,0.3)]">
+                <span class="text-gray-400 text-xs">KỶ LỤC: <span id="highScoreDisplay" class="text-white text-base mr-3">0</span></span>
+                <span class="text-[#D4E157]">ĐIỂM: <span id="scorePlayer" class="text-2xl">0</span></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- KHU VỰC GAME CANVAS -->
+    <main class="flex flex-col items-center relative">
+        <div class="text-center mb-3">
+            <h1 class="text-xl font-black text-[#F39C12] uppercase tracking-wide">Pickleball Training Mode</h1>
+            <p class="text-gray-400 text-xs mt-1">Điều khiển: <kbd class="bg-gray-700 px-1.5 py-0.5 rounded text-white">A</kbd> / <kbd class="bg-gray-700 px-1.5 py-0.5 rounded text-white">D</kbd> di chuyển | <kbd class="bg-gray-700 px-1.5 py-0.5 rounded text-white">W</kbd> nhảy | <kbd class="bg-gray-700 px-2 py-0.5 rounded text-white">Space</kbd> đánh bóng</p>
+        </div>
+
+        <div class="relative w-full max-w-[800px]">
+            <canvas id="gameCanvas" width="800" height="400"></canvas>
+            
+            <!-- THÔNG BÁO TẠO KỶ LỤC MỚI (REAL-TIME TOAST) -->
+            <div id="recordBanner" class="absolute top-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-gray-900 font-black px-6 py-2.5 rounded-full shadow-[0_0_25px_rgba(250,204,21,0.9)] z-20 hidden flex items-center gap-2 border-2 border-yellow-200">
+                <span class="text-xl">🏆</span>
+                <span class="tracking-wide">TẠO KỶ LỤC MỚI!</span>
+                <span id="recordBannerScore" class="bg-gray-900 text-yellow-400 px-2.5 py-0.5 rounded-full text-sm font-bold">0 PTS</span>
+            </div>
+
+            <!-- MÀN HÌNH BẮT ĐẦU -->
+            <div id="startScreen" class="absolute inset-0 bg-gray-900/95 flex flex-col items-center justify-center z-10 rounded-lg">
+                <div class="bg-[#3498DB]/20 text-[#3498DB] font-black px-4 py-1 rounded-full text-xs mb-3 border border-[#3498DB]/40">🏓 OFFICIAL TRAINING HUB</div>
+                <h2 class="text-3xl font-black text-[#D4E157] mb-2">CHẾ ĐỘ TẬP LUYỆN</h2>
+                <p class="text-gray-300 text-sm mb-6 text-center max-w-md">Rèn luyện phản xạ đỉnh cao! Đón và đánh trả các đường bóng từ máy bắn tự động qua lưới.</p>
+                <button onclick="startGame()" class="px-8 py-3 bg-[#3498DB] hover:bg-blue-500 rounded-full font-bold text-white text-base transition shadow-lg cursor-pointer">Bắt Đầu Ngay</button>
+            </div>
+
+            <!-- MÀN HÌNH GAME OVER -->
+            <div id="gameOverScreen" class="absolute inset-0 bg-black/95 flex flex-col items-center justify-center hidden rounded-lg z-10 backdrop-blur-sm">
+                <div id="newRecordBadge" class="bg-yellow-500/20 text-yellow-400 font-black px-5 py-1.5 rounded-full text-sm mb-2 border border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.3)] hidden animate-pulse">
+                    🏆 XÁC NHẬN TẠO KỶ LỤC MỚI!
+                </div>
+                <h2 class="text-4xl font-black text-red-500 mb-1 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]" id="gameOverHeading">GAME OVER</h2>
+                <h3 id="resultMessage" class="text-2xl font-black mb-4">TRY AGAIN 💪</h3>
+                
+                <div class="bg-gray-800/80 border border-gray-700 rounded-xl p-5 mb-5 text-center shadow-2xl min-w-[280px]">
+                    <p class="text-gray-400 text-xs mb-1">Điểm đạt được</p>
+                    <p id="finalScore" class="text-4xl text-[#D4E157] font-black mb-3">0</p>
+                    <p class="text-gray-400 text-xs mb-1 border-t border-gray-700/60 pt-3">Kỷ lục cá nhân</p>
+                    <p id="finalHighScore" class="text-xl text-white font-bold">0</p>
+                </div>
+                <button onclick="resetGame()" class="px-8 py-3 bg-[#F39C12] hover:bg-orange-600 rounded-full font-bold text-white text-base transition shadow-lg cursor-pointer">Chơi Lại Ngay</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        
+        const scorePlayerEl = document.getElementById("scorePlayer");
+        const highScoreDisplay = document.getElementById("highScoreDisplay");
+        const startScreen = document.getElementById("startScreen");
+        const gameOverScreen = document.getElementById("gameOverScreen");
+        const resultMessage = document.getElementById("resultMessage");
+        
+        let isGameStarted = false;
+        let isGameOver = false;
+        let scorePlayer = 0;
+        let lives = 2; 
+        const groundY = 350;
+        let machineTimer = null; 
+
+        let highScore = parseInt(localStorage.getItem("picko247_highscore")) || 0;
+        let previousHighScore = highScore;
+        let isRecordBrokenThisRun = false;
+        let toastTimeout = null;
+
+        highScoreDisplay.innerText = highScore;
+
+        function showRecordToast(score) {
+            const banner = document.getElementById("recordBanner");
+            const bannerScore = document.getElementById("recordBannerScore");
+            if (banner && bannerScore) {
+                bannerScore.innerText = `${score} PTS`;
+                banner.classList.remove("record-banner-active", "hidden");
+                void banner.offsetWidth; // force reflow
+                banner.classList.add("record-banner-active");
+                if (toastTimeout) clearTimeout(toastTimeout);
+                toastTimeout = setTimeout(() => {
+                    banner.classList.remove("record-banner-active");
+                    banner.classList.add("hidden");
+                }, 3000);
+            }
+        }
+
+        const net = { x: 395, y: 220, w: 15, h: 130 }; 
+        let balls = [];
+
+        const brandLogo = new Image();
+        brandLogo.src = "1785731892000_2058203668978058840_2058203668978058840_41d8175090018b88b03d8a22a3158175_2.jpg";
+
+        const machine = {
+            x: 700, y: groundY - 80, w: 65, h: 80,
+            draw() {
+                ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+                ctx.beginPath();
+                ctx.ellipse(this.x + this.w/2, this.y + this.h, 45, 12, 0, 0, Math.PI*2);
+                ctx.fill();
+
+                ctx.fillStyle = "#D4E157"; 
+                ctx.beginPath(); ctx.arc(this.x + 15, this.y - 5, 8, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(this.x + 32, this.y - 12, 8, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(this.x + 50, this.y - 5, 8, 0, Math.PI*2); ctx.fill();
+                
+                ctx.fillStyle = "rgba(236, 240, 241, 0.25)"; 
+                ctx.beginPath();
+                ctx.moveTo(this.x - 10, this.y - 25);
+                ctx.lineTo(this.x + this.w + 10, this.y - 25);
+                ctx.lineTo(this.x + this.w, this.y);
+                ctx.lineTo(this.x, this.y);
+                ctx.fill();
+
+                let bodyGrad = ctx.createLinearGradient(this.x, this.y, this.x + this.w, this.y);
+                bodyGrad.addColorStop(0, "#95A5A6");
+                bodyGrad.addColorStop(0.5, "#BDC3C7");
+                bodyGrad.addColorStop(1, "#7F8C8D");
+                ctx.fillStyle = bodyGrad;
+                
+                ctx.fillRect(this.x, this.y + 5, this.w, this.h - 10);
+                ctx.fillRect(this.x + 5, this.y, this.w - 10, this.h);
+
+                ctx.fillStyle = "#111";
+                ctx.beginPath(); ctx.arc(this.x + 12, this.y + this.h, 16, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(this.x + 52, this.y + this.h, 16, 0, Math.PI*2); ctx.fill();
+                
+                ctx.fillStyle = "#BDC3C7"; 
+                ctx.beginPath(); ctx.arc(this.x + 12, this.y + this.h, 7, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(this.x + 52, this.y + this.h, 7, 0, Math.PI*2); ctx.fill();
+
+                ctx.fillStyle = "#2C3E50";
+                ctx.beginPath(); ctx.arc(this.x - 5, this.y + 30, 15, 0, Math.PI*2); ctx.fill();
+                
+                ctx.save();
+                ctx.translate(this.x - 5, this.y + 30);
+                ctx.rotate(-Math.PI / 6); 
+                
+                let barrelGrad = ctx.createLinearGradient(-40, -12, 0, -12);
+                barrelGrad.addColorStop(0, "#34495E");
+                barrelGrad.addColorStop(1, "#17202A");
+                ctx.fillStyle = barrelGrad;
+                ctx.fillRect(-45, -12, 50, 24); 
+                
+                ctx.fillStyle = "#E74C3C"; 
+                ctx.fillRect(-45, -14, 6, 28);
+                ctx.restore();
+                
+                ctx.fillStyle = "#111"; 
+                ctx.fillRect(this.x + 25, this.y + 15, 15, 30); 
+                
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = "#2ECC71";
+                ctx.fillStyle = "#2ECC71";
+                ctx.beginPath(); ctx.arc(this.x + 32, this.y + 24, 4, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(this.x + 32, this.y + 36, 4, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 0; 
+            },
+            shoot() {
+                if (isGameOver) return;
+                let newBall = {
+                    x: this.x - 45,
+                    y: this.y + 10,
+                    radius: 11,
+                    vy: -(11 + Math.random() * 2), 
+                    vx: -(5.5 + Math.random() * 4.5), 
+                    gravity: 0.4,
+                    color: "#D4E157",
+                    isHitByPlayer: false,
+                    hasScored: false,
+                    isActive: true 
+                };
+                balls.push(newBall);
+                if (balls.length > 10) balls.shift();
+            }
+        };
+
+        class Character {
+            constructor(x) {
+                this.x = x; this.y = groundY - 80; this.w = 40; this.h = 80;
+                this.speed = 9; this.vy = 0; this.gravity = 0.8; 
+                this.isGrounded = false; this.swingTimer = 0;
+                this.walkFrame = 0; this.isMoving = false; 
+            }
+
+            draw() {
+                let cx = this.x + this.w / 2;
+                let cy = this.y + this.h / 2;
+                
+                if (this.isMoving && this.isGrounded) this.walkFrame += 0.5; 
+                else this.walkFrame = 0; 
+                
+                let bob = this.isGrounded ? Math.abs(Math.sin(this.walkFrame)) * 6 : -5; 
+                let legSwing = this.isGrounded ? Math.sin(this.walkFrame) * 15 : 0;
+                let charY = cy - bob;
+
+                ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+                ctx.beginPath();
+                ctx.ellipse(cx, groundY, 20, 5, 0, 0, Math.PI*2);
+                ctx.fill();
+
+                ctx.strokeStyle = "#34495E"; ctx.lineWidth = 6; ctx.lineCap = "round";
+                ctx.beginPath(); ctx.moveTo(cx - 5, charY + 15); ctx.lineTo(cx - 5 + legSwing, this.y + this.h); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(cx + 5, charY + 15); ctx.lineTo(cx + 5 - legSwing, this.y + this.h); ctx.stroke();
+
+                ctx.fillStyle = "#ECF0F1";
+                ctx.beginPath(); ctx.arc(cx - 5 + legSwing + (legSwing > 0 ? 5 : -5), this.y + this.h, 5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + 5 - legSwing + (legSwing < 0 ? 5 : -5), this.y + this.h, 5, 0, Math.PI*2); ctx.fill();
+
+                ctx.fillStyle = "#F39C12"; 
+                ctx.beginPath(); ctx.moveTo(cx - 14, charY - 15); ctx.lineTo(cx + 14, charY - 15); 
+                ctx.lineTo(cx + 12, charY + 20); ctx.lineTo(cx - 12, charY + 20); ctx.fill();
+                ctx.fillStyle = "white"; ctx.fillRect(cx - 4, charY - 10, 8, 20);
+
+                let headY = charY - 28;
+                ctx.fillStyle = "#FAD7A1"; 
+                ctx.beginPath(); ctx.arc(cx, headY, 15, 0, Math.PI*2); ctx.fill();
+                
+                ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(cx + 6, headY - 3, 6, 0, Math.PI*2); ctx.fill(); 
+                ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(cx + 8, headY - 3, 2, 0, Math.PI*2); ctx.fill(); 
+                
+                ctx.strokeStyle = "#8E44AD"; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(cx + 2, headY - 10); ctx.lineTo(cx + 10, headY - 8); ctx.stroke();
+                
+                ctx.fillStyle = "#3498DB";
+                ctx.beginPath(); ctx.arc(cx, headY - 5, 15, Math.PI, Math.PI*2); ctx.fill(); 
+                ctx.fillRect(cx - 22, headY - 5, 12, 4); 
+
+                let pivotX = cx;
+                let pivotY = charY - 10;
+                
+                ctx.save();
+                ctx.translate(pivotX, pivotY); 
+                
+                let angle = -Math.PI / 6; 
+                
+                if (this.swingTimer > 0) {
+                    let progress = this.swingTimer / 15; 
+                    angle = -Math.PI / 6 - (progress * Math.PI * 0.65); 
+                    this.swingTimer--;
+                }
+                
+                ctx.rotate(angle); 
+                
+                ctx.strokeStyle = "#FAD7A1"; ctx.lineWidth = 6; ctx.lineCap = "round";
+                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 18); ctx.stroke();
+                
+                ctx.strokeStyle = "#2C3E50"; ctx.lineWidth = 5;
+                ctx.beginPath(); ctx.moveTo(0, 18); ctx.lineTo(0, 28); ctx.stroke();
+                
+                ctx.fillStyle = "#E74C3C";
+                ctx.beginPath(); ctx.ellipse(0, 40, 11, 16, 0, 0, Math.PI*2); ctx.fill();
+                
+                ctx.restore(); 
+            }
+
+            update() {
+                this.vy += this.gravity; this.y += this.vy;
+                if (this.y + this.h >= groundY) {
+                    this.y = groundY - this.h; this.vy = 0; this.isGrounded = true;
+                }
+            }
+            jump() { if (this.isGrounded) { this.vy = -12; this.isGrounded = false; } }
+        }
+
+        const player = new Character(150);
+        const keys = { ArrowLeft: false, ArrowRight: false, KeyA: false, KeyD: false };
+
+        window.addEventListener("keydown", (e) => {
+            if (keys.hasOwnProperty(e.code)) keys[e.code] = true;
+            if (e.code === "ArrowUp" || e.code === "KeyW") player.jump();
+            
+            if (e.code === "Space") {
+                for (let i = 0; i < balls.length; i++) {
+                    let b = balls[i];
+                    if (b.isActive) {
+                        let dist = Math.hypot(b.x - (player.x + player.w/2), b.y - (player.y + player.h/2));
+                        if (dist < 100 && b.x > player.x - 30 && b.x < player.x + 80) {
+                            b.vx = 7 + Math.random() * 3; 
+                            b.vy = -9 - Math.random() * 3; 
+                            b.isHitByPlayer = true;
+                            break; 
+                        }
+                    }
+                }
+                player.swingTimer = 15; 
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener("keyup", (e) => {
+            if (keys.hasOwnProperty(e.code)) keys[e.code] = false;
+        });
+
+        function loseLife() {
+            if (isGameOver) return;
+            lives--;
+            
+            if (lives === 1) {
+                let try2 = document.getElementById("try2");
+                try2.classList.add("lost");
+                try2.innerText = "❌";
+            }
+            if (lives === 0) {
+                let try1 = document.getElementById("try1");
+                try1.classList.add("lost");
+                try1.innerText = "❌";
+            }
+            if (lives <= 0) triggerGameOver();
+        }
+
+        function triggerGameOver() {
+            isGameOver = true;
+            clearInterval(machineTimer); 
+            
+            const newRecordBadge = document.getElementById("newRecordBadge");
+
+            if ((scorePlayer > previousHighScore && scorePlayer > 0) || isRecordBrokenThisRun) {
+                highScore = scorePlayer;
+                localStorage.setItem("picko247_highscore", highScore);
+                highScoreDisplay.innerText = highScore;
+                
+                resultMessage.innerText = "🏆 KỶ LỤC MỚI! 🎉";
+                resultMessage.className = "text-3xl font-black mb-3 text-[#FACC15] drop-shadow-[0_0_15px_rgba(250,204,21,0.8)]";
+                if (newRecordBadge) newRecordBadge.classList.remove("hidden");
+            } else {
+                resultMessage.innerText = "TRY AGAIN 💪";
+                resultMessage.className = "text-xl font-black mb-3 text-gray-400";
+                if (newRecordBadge) newRecordBadge.classList.add("hidden");
+            }
+
+            document.getElementById("finalScore").innerText = scorePlayer;
+            document.getElementById("finalHighScore").innerText = highScore;
+            gameOverScreen.classList.remove("hidden");
+        }
+
+        function handlePhysics() {
+            player.isMoving = false; 
+            if ((keys.ArrowLeft || keys.KeyA) && player.x > 0) { player.x -= player.speed; player.isMoving = true; }
+            if ((keys.ArrowRight || keys.KeyD) && player.x + player.w < net.x - 20) { player.x += player.speed; player.isMoving = true; }
+
+            for (let i = 0; i < balls.length; i++) {
+                let b = balls[i];
+                if (!b.isActive) continue; 
+
+                b.vy += b.gravity; b.x += b.vx; b.y += b.vy;
+
+                if (b.isHitByPlayer && !b.hasScored && b.x > net.x + net.w) {
+                    scorePlayer++;
+                    scorePlayerEl.innerText = scorePlayer;
+                    b.hasScored = true;
+
+                    if (scorePlayer > highScore && scorePlayer > 0) {
+                        if (!isRecordBrokenThisRun) {
+                            isRecordBrokenThisRun = true;
+                            showRecordToast(scorePlayer);
+                        }
+                        highScore = scorePlayer;
+                        localStorage.setItem("picko247_highscore", highScore);
+                        highScoreDisplay.innerText = highScore;
+                    }
+                }
+
+                if (b.x + b.radius > net.x && b.x - b.radius < net.x + net.w) {
+                    if (b.y + b.radius > net.y) b.vx *= -0.7; 
+                }
+
+                if (b.y + b.radius >= groundY) {
+                    b.y = groundY - b.radius; b.vx = 0; b.isActive = false; 
+                    if (b.x < net.x) loseLife();
+                }
+                
+                if (b.x + b.radius < 0) { b.isActive = false; loseLife(); }
+            }
+        }
+
+        function drawEnvironment() {
+            let bgGrad = ctx.createLinearGradient(0, 0, 0, groundY);
+            bgGrad.addColorStop(0, "#111827"); 
+            bgGrad.addColorStop(1, "#1F2937"); 
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, canvas.width, groundY);
+
+            if (brandLogo.complete && brandLogo.naturalWidth > 0) {
+                ctx.save();
+                ctx.globalAlpha = 0.15; 
+                let imgWidth = 500; 
+                let imgHeight = (brandLogo.naturalHeight / brandLogo.naturalWidth) * imgWidth;
+                
+                try {
+                    ctx.drawImage(brandLogo, canvas.width/2 - imgWidth/2, (groundY/2) - imgHeight/2, imgWidth, imgHeight);
+                } catch (error) {
+                    console.warn("Lỗi vẽ logo:", error);
+                }
+                ctx.restore();
+            }
+
+            let courtGrad = ctx.createLinearGradient(0, groundY, 0, canvas.height);
+            courtGrad.addColorStop(0, "#27AE60"); 
+            courtGrad.addColorStop(1, "#145A32"); 
+            ctx.fillStyle = courtGrad;
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+            
+            ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+            ctx.fillRect(0, groundY + 10, canvas.width, 3); 
+            ctx.fillRect(0, groundY + 35, canvas.width, 5); 
+
+            const nX = net.x, nY = net.y, nW = net.w, nH = net.h;
+            
+            let poleGrad = ctx.createLinearGradient(nX + 2, nY, nX + 12, nY);
+            poleGrad.addColorStop(0, "#BDC3C7");
+            poleGrad.addColorStop(1, "#7F8C8D");
+            ctx.fillStyle = poleGrad;
+            ctx.fillRect(nX + 2, nY, 10, nH);
+            
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let i = 12; i < nH; i += 8) {
+                ctx.moveTo(nX, nY + i); ctx.lineTo(nX + nW, nY + i);
+            }
+            for (let i = 2; i < nW; i += 6) {
+                ctx.moveTo(nX + i, nY); ctx.lineTo(nX + i, nY + nH);
+            }
+            ctx.stroke();
+            
+            ctx.fillStyle = "#ECF0F1"; 
+            ctx.fillRect(nX - 2, nY, nW + 4, 12);
+            
+            for (let i = 0; i < balls.length; i++) {
+                let b = balls[i];
+                
+                if (b.isActive && b.y < groundY) {
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+                    ctx.beginPath();
+                    let shadowWidth = Math.max(5, b.radius + (groundY - b.y) * 0.03);
+                    ctx.ellipse(b.x, groundY, shadowWidth, shadowWidth/3, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.fillStyle = b.isActive ? b.color : "#7F8C8D";
+                ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2); ctx.fill();
+                
+                if (b.isActive) {
+                    ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
+                    ctx.beginPath(); ctx.arc(b.x - 3, b.y - 3, 2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(b.x + 4, b.y - 1, 2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(b.x - 1, b.y + 4, 2, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+        }
+
+        function startGame() {
+            startScreen.classList.add("hidden");
+            isGameStarted = true;
+            machine.shoot(); 
+            machineTimer = setInterval(() => { if (!isGameOver) machine.shoot(); }, 1000); 
+        }
+
+        function resetGame() {
+            isGameOver = false; scorePlayer = 0; lives = 2; balls = []; 
+            isRecordBrokenThisRun = false;
+            previousHighScore = highScore;
+            
+            scorePlayerEl.innerText = scorePlayer;
+
+            const banner = document.getElementById("recordBanner");
+            if (banner) banner.classList.add("hidden");
+
+            const newRecordBadge = document.getElementById("newRecordBadge");
+            if (newRecordBadge) newRecordBadge.classList.add("hidden");
+            
+            let try1 = document.getElementById("try1");
+            let try2 = document.getElementById("try2");
+            try1.classList.remove("lost"); try1.innerText = "✔️";
+            try2.classList.remove("lost"); try2.innerText = "✔️";
+            
+            player.x = 150; gameOverScreen.classList.add("hidden"); clearInterval(machineTimer);
+            
+            setTimeout(() => {
+                if (!isGameOver) {
+                    machine.shoot();
+                    machineTimer = setInterval(() => { if (!isGameOver) machine.shoot(); }, 1000);
+                }
+            }, 500);
+        }
+
+        function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
+            if (isGameStarted && !isGameOver) { handlePhysics(); player.update(); }
+            drawEnvironment(); machine.draw(); player.draw();
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>

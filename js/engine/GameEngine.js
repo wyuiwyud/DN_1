@@ -29,6 +29,8 @@ class GameEngine {
 
         this.activeGame = null;
         this.highScore = window.storageManager.getHighScore();
+        this.previousHighScore = this.highScore;
+        this.isRecordBrokenThisSession = false;
 
         // Bind update loop
         this.loop = this.loop.bind(this);
@@ -39,11 +41,21 @@ class GameEngine {
             this.activeGame.destroy();
         }
         this.activeGame = gameInstance;
+        this.activeGame.init();
+        this.activeGame.render(this.ctx);
         this.updateGameTitleUI();
+        
+        const gameId = this.activeGame ? (this.activeGame.id || this.activeGame.name || 'global') : 'global';
+        this.highScore = window.storageManager.getHighScore(gameId);
     }
 
     start() {
         if (!this.activeGame) return;
+
+        const gameId = this.activeGame ? (this.activeGame.id || this.activeGame.name || 'global') : 'global';
+        this.previousHighScore = window.storageManager.getHighScore(gameId);
+        this.highScore = this.previousHighScore;
+        this.isRecordBrokenThisSession = false;
 
         this.activeGame.init();
         window.particleSystem.clear();
@@ -85,7 +97,10 @@ class GameEngine {
         this.state = 'GAMEOVER';
         this.isRunning = false;
 
-        const isNewHigh = window.storageManager.saveHighScore(finalScore);
+        const gameId = this.activeGame ? (this.activeGame.id || this.activeGame.name || 'global') : 'global';
+        const res = window.storageManager.saveHighScore(finalScore, gameId);
+        const isNewHigh = res.isNewHigh || (finalScore > this.previousHighScore && finalScore > 0);
+
         if (isNewHigh) {
             this.highScore = finalScore;
         }
@@ -98,8 +113,21 @@ class GameEngine {
         if (scoreElem) scoreElem.innerText = finalScore;
         if (highElem) highElem.innerText = this.highScore;
 
-        const badge = document.getElementById('new-high-badge');
-        if (badge) badge.style.display = isNewHigh ? 'inline-block' : 'none';
+        const recordBadge = document.getElementById('new-high-badge');
+        if (recordBadge) {
+            recordBadge.style.display = isNewHigh ? 'inline-block' : 'none';
+        }
+
+        const gameoverTitle = document.querySelector('#gameover-overlay .overlay-title');
+        if (gameoverTitle) {
+            if (isNewHigh) {
+                gameoverTitle.innerHTML = '🏆 TẠO KỶ LỤC MỚI! 🎉';
+                gameoverTitle.style.color = '#FACC15';
+            } else {
+                gameoverTitle.innerHTML = 'GAME OVER';
+                gameoverTitle.style.color = 'var(--danger)';
+            }
+        }
 
         this.showOverlay('gameover-overlay');
     }
@@ -146,13 +174,29 @@ class GameEngine {
             const el = document.getElementById('hud-score');
             if (el) el.innerText = stats.score;
 
-            if (stats.score > this.highScore) {
+            if (stats.score > this.highScore && stats.score > 0) {
+                const isFirstTimeInRun = !this.isRecordBrokenThisSession;
+                this.isRecordBrokenThisSession = true;
                 this.highScore = stats.score;
+
+                const gameId = this.activeGame ? (this.activeGame.id || this.activeGame.name || 'global') : 'global';
+                window.storageManager.saveHighScore(stats.score, gameId);
+
+                if (isFirstTimeInRun) {
+                    this.showRecordBreakNotification(stats.score);
+                }
+
+                if (window.pickoPlatform) {
+                    window.pickoPlatform.syncGameScore(stats.score);
+                }
             }
         }
 
         const highEl = document.getElementById('hud-highscore');
         if (highEl) highEl.innerText = this.highScore;
+
+        const sideHigh = document.getElementById('side-user-highscore');
+        if (sideHigh) sideHigh.innerText = `${this.highScore} PTS`;
 
         if (stats.level !== undefined) {
             const el = document.getElementById('hud-level');
@@ -204,6 +248,47 @@ class GameEngine {
     setResolution(width, height) {
         this.canvas.width = width;
         this.canvas.height = height;
+    }
+
+    showRecordBreakNotification(score) {
+        if (window.audioManager) {
+            window.audioManager.playSound('coin');
+            setTimeout(() => { if (window.audioManager) window.audioManager.playSound('hit'); }, 150);
+        }
+
+        if (window.particleSystem && this.canvas) {
+            const centerX = this.canvas.width / 2;
+            const centerY = this.canvas.height / 3;
+            window.particleSystem.createExplosion(centerX, centerY, '#FACC15', 40, 8);
+            window.particleSystem.createExplosion(centerX, centerY, '#00F3FF', 30, 6);
+        }
+
+        let toast = document.getElementById('record-break-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'record-break-toast';
+            toast.className = 'record-break-toast';
+            const container = document.getElementById('game-container') || document.body;
+            container.appendChild(toast);
+        }
+
+        toast.innerHTML = `
+            <div class="record-toast-content">
+                <span class="record-toast-icon">🏆</span>
+                <div class="record-toast-text">
+                    <div class="record-toast-title">KỶ LỤC MỚI! NEW RECORD!</div>
+                    <div class="record-toast-score">${score} PTS</div>
+                </div>
+            </div>
+        `;
+        toast.classList.remove('show');
+        void toast.offsetWidth; // Force reflow
+        toast.classList.add('show');
+
+        if (this.toastTimeout) clearTimeout(this.toastTimeout);
+        this.toastTimeout = setTimeout(() => {
+            toast.classList.remove('show');
+        }, 3200);
     }
 }
 

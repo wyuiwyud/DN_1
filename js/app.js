@@ -1,117 +1,109 @@
 /**
  * app.js
- * Main application coordinator & DOM controller for POLY Game 2026.
+ * App coordinator for Picko 247 Sports & Play Hub and TryVibe Pickleball Training 🎯
  */
 document.addEventListener('DOMContentLoaded', () => {
-    // Instantiate Core Engine
     const engine = new GameEngine('canvas');
     window.engine = engine;
 
-    // Load Default Game (Sample Arcade Game)
-    const sampleGame = new SampleGame(engine.canvas, engine);
-    const blankGame = new BlankTemplate(engine.canvas, engine);
+    const trainingGame = new PickleballTraining(engine.canvas, engine);
+    engine.loadGame(trainingGame);
 
-    engine.loadGame(sampleGame);
-
-    // =========================================================================
-    // System Logger Helper
-    // =========================================================================
-    const systemLogBox = document.getElementById('system-log');
-    function logSystem(msg, type = 'info') {
-        if (!systemLogBox) return;
-        const time = new Date().toLocaleTimeString('vi-VN', { hour12: false });
-        const div = document.createElement('div');
-        div.className = `log-entry ${type}`;
-        div.innerText = `[${time}] ${msg}`;
-        systemLogBox.appendChild(div);
-        systemLogBox.scrollTop = systemLogBox.scrollHeight;
+    function setExpandedGameMode(expand = true) {
+        const arcadeLayout = document.querySelector('.game-arcade-layout');
+        if (expand) {
+            arcadeLayout?.classList.add('expanded-game-mode');
+        } else {
+            arcadeLayout?.classList.remove('expanded-game-mode');
+        }
     }
-    window.app = { logSystem };
 
-    logSystem("System initialized. Canvas 1280x720 60FPS ready.", "success");
-    logSystem("Press [PLAY] to start sample game or switch to Blank Template.", "info");
+    let countdownTimerId = null;
+    function startCountdownAndGame() {
+        setExpandedGameMode(true);
+        engine.showOverlay('countdown-overlay');
 
-    // =========================================================================
-    // Overlay Buttons (Start, Pause, GameOver, Restart)
-    // =========================================================================
+        const numEl = document.getElementById('countdown-number');
+        let count = 3;
+
+        if (numEl) numEl.innerText = count;
+        window.audioManager.playSound('hit');
+
+        if (countdownTimerId) clearInterval(countdownTimerId);
+
+        countdownTimerId = setInterval(() => {
+            count--;
+            if (count > 0) {
+                if (numEl) numEl.innerText = count;
+                window.audioManager.playSound('hit');
+            } else if (count === 0) {
+                if (numEl) numEl.innerText = 'GO!';
+                window.audioManager.playSound('coin');
+            } else {
+                clearInterval(countdownTimerId);
+                engine.start();
+            }
+        }, 850);
+    }
+
+    function exitGameAndCollapse() {
+        if (countdownTimerId) clearInterval(countdownTimerId);
+        engine.isRunning = false;
+        engine.state = 'IDLE';
+        setExpandedGameMode(false);
+        engine.showOverlay('start-overlay');
+        if (engine.activeGame && engine.ctx) {
+            engine.activeGame.init();
+            engine.activeGame.render(engine.ctx);
+        }
+    }
+
     document.getElementById('btn-start-game')?.addEventListener('click', () => {
-        engine.start();
-        logSystem("Game session started.", "success");
+        startCountdownAndGame();
     });
 
     document.getElementById('btn-resume-game')?.addEventListener('click', () => {
         engine.resume();
-        logSystem("Game resumed.", "info");
-    });
-
-    document.getElementById('btn-restart-game')?.addEventListener('click', () => {
-        engine.start();
-        logSystem("Game restarted.", "warn");
     });
 
     document.getElementById('btn-restart-game-over')?.addEventListener('click', () => {
-        engine.start();
-        logSystem("Game restarted from Game Over screen.", "warn");
+        startCountdownAndGame();
     });
 
-    // Toolbar Pause Button
+    document.getElementById('btn-exit-game-pause')?.addEventListener('click', exitGameAndCollapse);
+    document.getElementById('btn-exit-game-over')?.addEventListener('click', exitGameAndCollapse);
+    document.getElementById('btn-exit-game-bar')?.addEventListener('click', exitGameAndCollapse);
+
     document.getElementById('btn-pause-toggle')?.addEventListener('click', () => {
         engine.togglePause();
     });
 
-    // Toolbar Reset Button
     document.getElementById('btn-reset-game')?.addEventListener('click', () => {
         engine.start();
     });
 
-    // =========================================================================
-    // Game Selector Dropdown (Demo vs Blank Template for Exam Day)
-    // =========================================================================
-    const gameSelect = document.getElementById('game-selector');
-    if (gameSelect) {
-        gameSelect.addEventListener('change', (e) => {
-            const val = e.target.value;
-            if (val === 'sample') {
-                engine.loadGame(sampleGame);
-                logSystem("Loaded: Cyber Core (Demo Game)", "info");
-            } else if (val === 'blank') {
-                engine.loadGame(blankGame);
-                logSystem("Loaded: Blank Competition Template", "warn");
-            }
-            engine.showOverlay('start-overlay');
+    const btnTheme = document.getElementById('btn-toggle-theme');
+    const savedTheme = localStorage.getItem('picko_theme') || 'dark';
+
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-theme');
+        if (btnTheme) btnTheme.innerHTML = '<i class="fas fa-moon"></i>';
+    }
+
+    if (btnTheme) {
+        btnTheme.addEventListener('click', () => {
+            const isLight = document.body.classList.toggle('light-theme');
+            btnTheme.innerHTML = isLight ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+            localStorage.setItem('picko_theme', isLight ? 'light' : 'dark');
         });
     }
 
-    // Resolution Selector Dropdown
-    const resSelect = document.getElementById('res-selector');
-    if (resSelect) {
-        resSelect.addEventListener('change', (e) => {
-            const [w, h] = e.target.value.split('x').map(Number);
-            engine.setResolution(w, h);
-            logSystem(`Canvas resolution updated to ${w}x${h}`, "info");
-        });
-    }
-
-    // Theme Selector Dropdown
-    const themeSelect = document.getElementById('theme-selector');
-    if (themeSelect) {
-        themeSelect.addEventListener('change', (e) => {
-            const theme = e.target.value;
-            document.body.setAttribute('data-theme', theme);
-            logSystem(`UI Theme changed to: ${theme.toUpperCase()}`, "info");
-        });
-    }
-
-    // =========================================================================
-    // Header Audio & UI Controls
-    // =========================================================================
     const btnSound = document.getElementById('btn-toggle-sound');
     if (btnSound) {
         btnSound.addEventListener('click', () => {
             const active = window.audioManager.toggleSound();
             btnSound.classList.toggle('active', active);
             btnSound.innerHTML = active ? '<i class="fas fa-volume-up"></i>' : '<i class="fas fa-volume-mute"></i>';
-            logSystem(`Sound SFX ${active ? 'Enabled' : 'Muted'}`, "info");
         });
     }
 
@@ -125,107 +117,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (container.webkitRequestFullscreen) {
                     container.webkitRequestFullscreen();
                 }
-                btnFullscreen.classList.add('active');
-                logSystem("Entered Fullscreen Mode", "info");
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
-                btnFullscreen.classList.remove('active');
-                logSystem("Exited Fullscreen Mode", "info");
+            } else if (document.exitFullscreen) {
+                document.exitFullscreen();
             }
         });
     }
 
-    // =========================================================================
-    // Exam Debug & Cheats Panel
-    // =========================================================================
-    document.getElementById('cheat-add-score')?.addEventListener('click', () => {
-        if (engine.activeGame && engine.state === 'PLAYING') {
-            engine.activeGame.score = (engine.activeGame.score || 0) + 100;
-            logSystem("Debug: Added +100 Score", "warn");
-        }
-    });
-
-    document.getElementById('cheat-heal')?.addEventListener('click', () => {
-        if (engine.activeGame && engine.activeGame.player) {
-            engine.activeGame.player.health = engine.activeGame.player.maxHealth || 100;
-            logSystem("Debug: Restored Full Health", "success");
-        }
-    });
-
-    document.getElementById('cheat-clear-hazards')?.addEventListener('click', () => {
-        if (engine.activeGame && engine.activeGame.hazards) {
-            engine.activeGame.hazards = [];
-            window.particleSystem.clear();
-            logSystem("Debug: Cleared all active hazards", "warn");
-        }
-    });
-
-    document.getElementById('btn-clear-highscore')?.addEventListener('click', () => {
-        window.storageManager.set('highscore', 0);
-        engine.highScore = 0;
-        engine.updateHUD({ score: engine.activeGame ? engine.activeGame.score : 0 });
-        logSystem("High Score has been reset to 0", "warn");
-    });
-
-    // =========================================================================
-    // Mobile Touch Virtual D-Pad Buttons
-    // =========================================================================
-    const touchMap = {
-        'btn-touch-up': 'VirtualUp',
-        'btn-touch-down': 'VirtualDown',
-        'btn-touch-left': 'VirtualLeft',
-        'btn-touch-right': 'VirtualRight',
-        'btn-touch-action': 'VirtualAction'
-    };
-
-    Object.entries(touchMap).forEach(([id, virtualKey]) => {
-        const btn = document.getElementById(id);
-        if (btn) {
-            btn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                window.inputManager.setVirtualKey(virtualKey, true);
-            });
-            btn.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                window.inputManager.setVirtualKey(virtualKey, false);
-            });
-            btn.addEventListener('mousedown', () => {
-                window.inputManager.setVirtualKey(virtualKey, true);
-            });
-            btn.addEventListener('mouseup', () => {
-                window.inputManager.setVirtualKey(virtualKey, false);
-            });
-        }
-    });
-
-    // =========================================================================
-    // Modal Windows (Help / Instructions)
-    // =========================================================================
-    const modal = document.getElementById('help-modal');
-    document.getElementById('btn-open-help')?.addEventListener('click', () => {
-        modal?.classList.add('active');
-    });
-    document.getElementById('btn-close-help')?.addEventListener('click', () => {
-        modal?.classList.remove('active');
-    });
-    modal?.addEventListener('click', (e) => {
-        if (e.target === modal) modal.classList.remove('active');
-    });
-
-    // Global Key Shortcuts (P: Pause, M: Mute, F: Fullscreen, R: Restart)
     window.addEventListener('keydown', (e) => {
+        if (document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
         if (e.code === 'KeyP') {
             engine.togglePause();
-        } else if (e.code === 'KeyM') {
-            btnSound?.click();
-        } else if (e.code === 'KeyF') {
-            btnFullscreen?.click();
-        } else if (e.code === 'KeyR' && e.ctrlKey) {
-            // let normal refresh happen
         } else if (e.code === 'KeyR') {
             engine.start();
+        } else if (e.code === 'KeyF') {
+            btnFullscreen?.click();
         }
     });
 });
