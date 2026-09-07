@@ -1009,6 +1009,23 @@ body {
     background-color: var(--bg-dark-saas);
 }
 
+html {
+    scroll-behavior: smooth;
+}
+
+button,
+input,
+select {
+    font: inherit;
+}
+
+button,
+input,
+select,
+a {
+    -webkit-tap-highlight-color: transparent;
+}
+
 .gold-text {
     color: var(--gold-primary) !important;
 }
@@ -1487,3 +1504,276 @@ body {
     font-size: 0.85rem;
     color: #1e1b4b;
 }
+
+@media (max-width: 900px) {
+    .site-header {
+        padding: 0.75rem 1rem;
+    }
+
+    .header-container {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .header-left {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .header-nav-tabs {
+        order: 3;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        justify-content: flex-start;
+        padding: 0.3rem;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .header-nav-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .nav-tab-link {
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .hero-agency-showcase,
+    .perspective-grid-wrapper,
+    .perspective-grid-container,
+    .social-proof-section,
+    .social-proof-title,
+    .marquee-wrapper,
+    .marquee-track,
+    .portfolio-card,
+    .card-thumb,
+    .card-info,
+    .glass-panel,
+    .app-container {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+
+    .live-game-badge {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+
+    .hero-agency-showcase {
+        padding: 2rem 1rem 0.5rem;
+        max-width: 100%;
+    }
+
+    .hero-headline {
+        font-size: clamp(1.9rem, 8vw, 3rem);
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .hero-subtext {
+        font-size: 0.95rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .app-container {
+        padding: 1rem;
+    }
+
+    .glass-panel {
+        padding: 1rem;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.85rem;
+    }
+
+    .section-title {
+        font-size: 1rem;
+        line-height: 1.4;
+        letter-spacing: 0.5px;
+    }
+
+    .filter-bar {
+        width: 100%;
+    }
+
+    .tour-filter-btn {
+        flex: 1 1 calc(50% - 0.5rem);
+        text-align: center;
+        min-height: 42px;
+    }
+
+    .tournaments-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .leaderboard-table {
+        min-width: 760px;
+    }
+
+    .game-arcade-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .arcade-cabinet {
+        max-width: 100%;
+    }
+
+    .overlay-title {
+        font-size: 1.5rem;
+    }
+
+    .overlay-desc {
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 560px) {
+    body {
+        min-width: 320px;
+    }
+
+    .saas-header {
+        padding: 0.7rem 0.75rem;
+    }
+
+    .brand-logo {
+        gap: 0.55rem;
+    }
+
+    .logo-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 1.2rem;
+    }
+
+    .brand-title {
+        font-size: 1.05rem;
+        letter-spacing: 1.2px;
+    }
+
+    .brand-subtitle {
+        font-size: 0.56rem;
+        letter-spacing: 1px;
+    }
+
+    .header-actions {
+        gap: 0.5rem;
+    }
+
+    .btn-secondary {
+        min-width: 42px;
+        min-height: 42px;
+        padding: 0.4rem 0.55rem;
+    }
+
+    .live-game-badge {
+        font-size: 0.7rem;
+        padding: 0.35rem 0.7rem;
+    }
+
+    .hero-badge-pill {
+        font-size: 0.7rem;
+        padding: 0.35rem 0.8rem;
+    }
+
+    .social-proof-title {
+        letter-spacing: 1px;
+    }
+
+    .marquee-track {
+        gap: 1.5rem;
+    }
+
+    .partner-logo {
+        font-size: 0.74rem;
+    }
+
+    .section-title {
+        font-size: 0.9rem;
+    }
+
+    .tour-filter-btn {
+        flex-basis: 100%;
+        width: 100%;
+    }
+
+    .tour-body {
+        padding: 0.9rem;
+    }
+
+    .tour-title {
+        font-size: 1rem;
+    }
+
+    .tour-info-row {
+        font-size: 0.8rem;
+    }
+
+    .podium-mini-box {
+        font-size: 0.76rem;
+    }
+
+    .game-center-viewport {
+        width: 100%;
+    }
+
+    #game-container {
+        border-radius: 14px;
+    }
+
+    .overlay-screen {
+        padding: 1rem;
+    }
+
+    .overlay-title {
+        font-size: 1.2rem;
+    }
+
+    .countdown-number-anim {
+        font-size: 3.2rem;
+    }
+}
+
+@media (max-width: 420px) {
+    .header-nav-tabs {
+        gap: 0.25rem;
+    }
+
+    .nav-tab-link {
+        padding: 0.42rem 0.7rem;
+        font-size: 0.68rem;
+    }
+
+    .header-actions {
+        justify-content: center;
+    }
+
+    .hero-headline {
+        font-size: 1.7rem;
+        letter-spacing: 0.5px;
+    }
+
+    .hero-subtext {
+        font-size: 0.85rem;
+    }
+
+    .app-container {
+        padding: 0.75rem;
+    }
+
+    .glass-panel {
+        padding: 0.8rem;
+    }
+}
+
